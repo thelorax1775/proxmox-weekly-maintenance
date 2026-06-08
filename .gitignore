@@ -1,0 +1,16 @@
+# Logs produced by the script
+*.log
+
+# Editor swap / backup files
+*.swp
+*.swo
+*~
+.*.swp
+
+# Environment / config with secrets
+.env
+*.conf.local
+
+# OS artefacts
+.DS_Store
+Thumbs.db

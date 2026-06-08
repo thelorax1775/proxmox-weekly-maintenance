@@ -1,0 +1,32 @@
+name: ShellCheck
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: Lint shell scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck \
+            --severity=warning \
+            --shell=bash \
+            --external-sources \
+            scripts/weekly-maintenance.sh

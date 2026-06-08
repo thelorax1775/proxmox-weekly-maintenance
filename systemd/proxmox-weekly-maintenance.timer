@@ -1,0 +1,11 @@
+[Unit]
+Description=Proxmox VE Weekly Maintenance Timer — runs every Sunday at 03:00
+Documentation=https://github.com/<user>/proxmox-weekly-maintenance
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
