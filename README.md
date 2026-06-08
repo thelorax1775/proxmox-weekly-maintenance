@@ -9,6 +9,7 @@ Automated weekly maintenance for Proxmox VE. Downloads and runs the official [co
 ## Features
 
 - **Three-step maintenance pipeline** — repo updates → LXC updates → app updates, run in order
+- **Fully unattended** — neutralises the upstream `whiptail`/`clear` prompts so it runs headless under systemd with no TTY
 - **Fresh downloads every run** — always uses the latest upstream scripts, no stale caches
 - **Retry logic** — retries failed downloads up to 3 times with a configurable delay
 - **Concurrent-run protection** — `flock`-based lock prevents overlapping executions
@@ -67,9 +68,29 @@ NOTIFICATION_EMAIL="admin@example.com"
 MAX_RETRIES=3
 RETRY_DELAY=10      # seconds between retries
 CURL_TIMEOUT=60     # seconds per curl attempt
+
+# update-apps.sh behaviour (controls the app-update step)
+APP_CONTAINER_SELECTION="all_running"  # all | all_running | all_stopped | "101,102,105"
+APP_BACKUP="no"                        # yes | no — backup each container before its app update
+APP_BACKUP_STORAGE=""                  # storage name, required only if APP_BACKUP=yes
+APP_AUTO_REBOOT="no"                   # yes | no — reboot containers that request it
+APP_CONTINUE_ON_ERROR="yes"            # yes | no — keep updating remaining apps if one fails
 ```
 
 All settings are optional. The script runs without a config file.
+
+### Unattended execution
+
+The three upstream scripts are interactive by default (`whiptail` dialogs and,
+for `update-apps.sh`, `var_*` prompts). This wrapper runs them **fully
+unattended** with no TTY:
+
+- `update-apps.sh` is driven by the `var_*` environment variables shown above.
+- `update-repo.sh` and `update-lxcs.sh` have no non-interactive mode upstream, so
+  the wrapper injects a small preamble at runtime that neutralises `clear` and
+  auto-answers `whiptail` (proceed = yes, skip non-running containers = yes, no
+  exclusions). The upstream scripts are still downloaded **verbatim** on every
+  run — only their runtime environment is controlled, the files are never edited.
 
 ---
 

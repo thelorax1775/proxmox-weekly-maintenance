@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Proxmox VE Weekly Maintenance Script
-# Downloads and runs official community scripts for repo, LXC, and app updates.
+# Downloads and runs the official community-scripts maintenance tools
+# unattended (no TTY / no interactive prompts).
 # Source: https://github.com/community-scripts/ProxmoxVE
 
 set -euo pipefail
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 readonly SCRIPT_NAME="proxmox-weekly-maintenance"
-readonly VERSION="1.0.0"
+readonly VERSION="1.1.0"
 readonly LOG_FILE="/var/log/${SCRIPT_NAME}.log"
 readonly LOCK_FILE="/var/lock/${SCRIPT_NAME}.lock"
 readonly CONFIG_FILE="/etc/${SCRIPT_NAME}.conf"
@@ -24,6 +25,14 @@ RETRY_DELAY="${RETRY_DELAY:-10}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-60}"
 DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
 NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL:-}"
+
+# update-apps.sh behaviour (passed through as var_* environment variables).
+# See: update-apps.sh --help
+APP_CONTAINER_SELECTION="${APP_CONTAINER_SELECTION:-all_running}"
+APP_BACKUP="${APP_BACKUP:-no}"
+APP_BACKUP_STORAGE="${APP_BACKUP_STORAGE:-}"
+APP_AUTO_REBOOT="${APP_AUTO_REBOOT:-no}"
+APP_CONTINUE_ON_ERROR="${APP_CONTINUE_ON_ERROR:-yes}"
 
 # ─── Load optional config file ────────────────────────────────────────────────
 # shellcheck source=/dev/null
@@ -107,7 +116,7 @@ check_root() {
 
 check_deps() {
     local missing=()
-    for cmd in curl flock bash date mktemp; do
+    for cmd in curl flock bash date mktemp hostname; do
         command -v "${cmd}" &>/dev/null || missing+=("${cmd}")
     done
 
@@ -151,6 +160,32 @@ acquire_lock() {
     fi
 }
 
+# ─── Non-interactive preamble ─────────────────────────────────────────────────
+# The upstream scripts use whiptail dialogs, the `clear` command, and (for
+# update-apps.sh) var_* environment variables. When run from systemd there is
+# no TTY, so whiptail/clear would fail and abort the script. This preamble is
+# prepended to each downloaded script before execution to force fully
+# unattended behaviour. It does NOT modify the downloaded file on disk —
+# scripts are still fetched verbatim from upstream on every run.
+build_preamble() {
+    cat <<PREAMBLE
+# ── injected by ${SCRIPT_NAME} for unattended execution ──
+clear() { :; }
+whiptail() { return 0; }
+export DEBIAN_FRONTEND=noninteractive
+export TERM="xterm"
+# update-apps.sh non-interactive configuration:
+export var_skip_confirm="yes"
+export var_unattended="yes"
+export var_container="${APP_CONTAINER_SELECTION}"
+export var_backup="${APP_BACKUP}"
+export var_backup_storage="${APP_BACKUP_STORAGE}"
+export var_auto_reboot="${APP_AUTO_REBOOT}"
+export var_continue_on_error="${APP_CONTINUE_ON_ERROR}"
+# ── end injected preamble ──
+PREAMBLE
+}
+
 # ─── Download and execute ─────────────────────────────────────────────────────
 download_and_run() {
     local script_name="$1"
@@ -191,8 +226,12 @@ download_and_run() {
         return 1
     fi
 
-    log_info "Executing ${script_name}..."
-    if bash -c "${script_content}"; then
+    # Prepend the non-interactive preamble, then execute the verbatim script.
+    local full_script
+    full_script="$(build_preamble)"$'\n'"${script_content}"
+
+    log_info "Executing ${script_name} (unattended)..."
+    if bash -c "${full_script}"; then
         log_ok "└─ OK: ${script_name}"
         return 0
     fi
@@ -230,32 +269,33 @@ Log:      ${LOG_FILE}"
 
 trap on_exit EXIT
 
+# ─── Maintenance run ──────────────────────────────────────────────────────────
+run_maintenance() {
+    log_info "Running ${#MAINTENANCE_SCRIPTS[@]} maintenance scripts in order..."
+
+    for script in "${MAINTENANCE_SCRIPTS[@]}"; do
+        # Exit immediately on the first failing script (spec requirement).
+        if ! download_and_run "${script}"; then
+            log_error "Aborting: ${script} failed"
+            return 1
+        fi
+    done
+
+    log_ok "All maintenance scripts completed successfully"
+}
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
+    check_root
+    check_deps
     setup_log
 
     log_step "════ Proxmox Weekly Maintenance v${VERSION} ═ $(hostname) ═ $(date '+%Y-%m-%d %H:%M:%S') ════"
 
-    check_root
-    check_deps
     check_proxmox
     acquire_lock
     check_internet
-
-    log_info "Running ${#MAINTENANCE_SCRIPTS[@]} maintenance scripts..."
-
-    local -a failed=()
-
-    for script in "${MAINTENANCE_SCRIPTS[@]}"; do
-        if ! download_and_run "${script}"; then
-            failed+=("${script}")
-        fi
-    done
-
-    if [[ "${#failed[@]}" -gt 0 ]]; then
-        log_error "Failed scripts: ${failed[*]}"
-        exit 1
-    fi
+    run_maintenance
 }
 
 main "$@"
