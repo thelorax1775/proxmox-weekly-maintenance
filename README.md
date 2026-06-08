@@ -39,13 +39,47 @@ git clone https://github.com/thelorax1775/proxmox-weekly-maintenance.git
 cd proxmox-weekly-maintenance
 
 # 3. Install the script to a system path
-sudo cp scripts/weekly-maintenance.sh /usr/local/sbin/proxmox-weekly-maintenance
-sudo chmod 750 /usr/local/sbin/proxmox-weekly-maintenance
+cp scripts/weekly-maintenance.sh /usr/local/sbin/proxmox-weekly-maintenance
+chmod 750 /usr/local/sbin/proxmox-weekly-maintenance
 
 # 4. Install and enable the systemd units
-sudo cp systemd/* /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now proxmox-weekly-maintenance.timer
+cp systemd/* /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now proxmox-weekly-maintenance.timer
+```
+
+> Commands are shown for the Proxmox `root` shell (the default), so `sudo` is
+> omitted. If you run as a non-root user, prefix each command with `sudo`.
+
+---
+
+## Updating
+
+To pull a newer version onto the host:
+
+```bash
+# 1. Pull the latest changes
+cd proxmox-weekly-maintenance
+git pull
+
+# 2. Re-install the script (the live copy is what actually runs)
+cp scripts/weekly-maintenance.sh /usr/local/sbin/proxmox-weekly-maintenance
+chmod 750 /usr/local/sbin/proxmox-weekly-maintenance
+
+# 3. Re-install the systemd units (only changes if .service/.timer were updated)
+cp systemd/* /etc/systemd/system/
+systemctl daemon-reload
+```
+
+`git pull` alone does **not** update what runs — you must re-copy the script to
+`/usr/local/sbin`. The timer stays enabled across updates (no need to re-run
+`enable --now`), and your `/etc/proxmox-weekly-maintenance.conf` is preserved.
+
+Test the new version immediately instead of waiting for Sunday:
+
+```bash
+systemctl start proxmox-weekly-maintenance.service
+tail -f /var/log/proxmox-weekly-maintenance.log
 ```
 
 ---
@@ -99,15 +133,15 @@ unattended** with no TTY:
 ### Run manually
 
 ```bash
-sudo proxmox-weekly-maintenance
+proxmox-weekly-maintenance
 # or
-sudo bash /usr/local/sbin/proxmox-weekly-maintenance
+bash /usr/local/sbin/proxmox-weekly-maintenance
 ```
 
 ### Run via systemd (on demand)
 
 ```bash
-sudo systemctl start proxmox-weekly-maintenance.service
+systemctl start proxmox-weekly-maintenance.service
 ```
 
 ---
@@ -139,10 +173,10 @@ systemctl status proxmox-weekly-maintenance.timer
 systemctl list-timers proxmox-weekly-maintenance.timer
 
 # Disable the timer
-sudo systemctl disable --now proxmox-weekly-maintenance.timer
+systemctl disable --now proxmox-weekly-maintenance.timer
 
 # Re-enable the timer
-sudo systemctl enable --now proxmox-weekly-maintenance.timer
+systemctl enable --now proxmox-weekly-maintenance.timer
 
 # View service logs (current boot)
 journalctl -u proxmox-weekly-maintenance.service -b
@@ -171,7 +205,7 @@ ls -la /var/lock/proxmox-weekly-maintenance.lock
 ```
 If no script is actually running (e.g. after a crash), remove the stale lock:
 ```bash
-sudo rm -f /var/lock/proxmox-weekly-maintenance.lock
+rm -f /var/lock/proxmox-weekly-maintenance.lock
 ```
 
 **Email notifications not arriving**
