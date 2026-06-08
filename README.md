@@ -1,6 +1,6 @@
 # proxmox-weekly-maintenance
 
-![ShellCheck](https://github.com/<user>/proxmox-weekly-maintenance/actions/workflows/shellcheck.yml/badge.svg)
+![ShellCheck](https://github.com/thelorax1775/proxmox-weekly-maintenance/actions/workflows/shellcheck.yml/badge.svg)
 
 Automated weekly maintenance for Proxmox VE. Downloads and runs the official [community-scripts/ProxmoxVE](https://github.com/community-scripts/ProxmoxVE) maintenance tools every Sunday at 03:00 via a systemd timer.
 
@@ -32,7 +32,7 @@ Automated weekly maintenance for Proxmox VE. Downloads and runs the official [co
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<user>/proxmox-weekly-maintenance.git
+git clone https://github.com/thelorax1775/proxmox-weekly-maintenance.git
 
 # 2. Enter the directory
 cd proxmox-weekly-maintenance

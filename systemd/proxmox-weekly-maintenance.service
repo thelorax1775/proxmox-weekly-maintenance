@@ -1,6 +1,6 @@
 [Unit]
 Description=Proxmox VE Weekly Maintenance
-Documentation=https://github.com/<user>/proxmox-weekly-maintenance
+Documentation=https://github.com/thelorax1775/proxmox-weekly-maintenance
 After=network-online.target
 Wants=network-online.target
 

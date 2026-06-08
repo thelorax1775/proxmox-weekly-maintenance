@@ -1,6 +1,6 @@
 [Unit]
 Description=Proxmox VE Weekly Maintenance Timer — runs every Sunday at 03:00
-Documentation=https://github.com/<user>/proxmox-weekly-maintenance
+Documentation=https://github.com/thelorax1775/proxmox-weekly-maintenance
 
 [Timer]
 OnCalendar=Sun *-*-* 03:00:00
