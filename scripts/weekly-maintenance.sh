@@ -8,7 +8,7 @@ set -euo pipefail
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 readonly SCRIPT_NAME="proxmox-weekly-maintenance"
-readonly VERSION="1.1.0"
+readonly VERSION="1.1.1"
 readonly LOG_FILE="/var/log/${SCRIPT_NAME}.log"
 readonly LOCK_FILE="/var/lock/${SCRIPT_NAME}.lock"
 readonly CONFIG_FILE="/etc/${SCRIPT_NAME}.conf"
@@ -84,6 +84,11 @@ send_discord() {
     local color="${2:-3066993}"   # 3066993=green  15158332=red
     [[ -z "${DISCORD_WEBHOOK_URL}" ]] && return 0
 
+    # Escape the message so it is always a valid JSON string value.
+    message="${message//\\/\\\\}"        # backslash (must be first)
+    message="${message//\"/\\\"}"        # double quote
+    message="${message//$'\n'/\\n}"      # newline
+
     curl -fsSL --max-time 15 \
         -X POST "${DISCORD_WEBHOOK_URL}" \
         -H "Content-Type: application/json" \
@@ -155,8 +160,12 @@ setup_log() {
 acquire_lock() {
     exec 200>"${LOCK_FILE}"
     if ! flock -n 200; then
-        log_error "Another instance is already running (lock: ${LOCK_FILE})"
-        exit 1
+        # Overlap with an already-running instance is an expected skip, not a
+        # maintenance failure — disarm the EXIT handler so no FAILED alert is
+        # sent, and exit cleanly so systemd does not mark the service failed.
+        log_warn "Another instance is already running (lock: ${LOCK_FILE}); skipping this run"
+        trap - EXIT
+        exit 0
     fi
 }
 
